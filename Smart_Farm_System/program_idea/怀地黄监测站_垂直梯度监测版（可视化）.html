@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>怀地黄垂直梯度监测部署</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: #f0f8ff; }
+        #canvas-container { width: 100vw; height: 100vh; display: block; touch-action: none; }
+        
+        /* UI 切换按钮 */
+        #ui-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: white;
+            border-radius: 50%;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 100;
+            font-size: 20px;
+            user-select: none;
+        }
+
+        /* UI 覆盖层 - 可折叠 */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            width: 280px;
+            backdrop-filter: blur(10px);
+            transition: height 0.3s ease;
+            overflow: hidden;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #ui-header {
+            padding: 12px 15px;
+            background: rgba(240, 244, 248, 0.9);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        
+        h1 { margin: 0; font-size: 15px; color: #2c3e50; font-weight: 700; }
+        #fold-icon { font-size: 12px; color: #999; transition: transform 0.3s; }
+        
+        #ui-content { padding: 15px; overflow-y: auto; }
+        #ui-layer.collapsed #ui-content { display: none; }
+        #ui-layer.collapsed #fold-icon { transform: rotate(-90deg); }
+
+        h2 { margin: 10px 0 5px 0; font-size: 13px; color: #2980b9; font-weight: 600; }
+        h2:first-child { margin-top: 0; }
+        
+        .tag { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-right: 5px; color: white; vertical-align: middle; }
+        .tag-air { background: #3498db; }
+        .tag-soil { background: #e67e22; }
+        
+        p { margin: 4px 0; font-size: 11px; color: #555; line-height: 1.5; }
+        ul { margin: 4px 0; padding-left: 15px; font-size: 11px; color: #666; }
+        li { margin-bottom: 4px; }
+        strong { color: #333; }
+
+        /* 3D 标签 */
+        .label {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            transition: opacity 0.2s;
+            border-left: 3px solid #e67e22; /* 橙色强调 */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        .label::after {
+            content: '';
+            position: absolute;
+            bottom: -15px; left: 50%;
+            width: 1px; height: 15px;
+            background: rgba(255,255,255,0.4);
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #666;
+            font-size: 12px;
+            background: rgba(255,255,255,0.8);
+            padding: 6px 16px;
+            border-radius: 20px;
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            #ui-layer { bottom: 80px; top: auto; width: auto; left: 15px; right: 15px; }
+            #controls-hint { bottom: 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <div id="ui-toggle" onclick="togglePanel()">📝</div>
+
+    <div id="ui-layer">
+        <div id="ui-header" onclick="togglePanel()">
+            <h1>方案一：垂直梯度监测系统</h1>
+            <span id="fold-icon">▼</span>
+        </div>
+        <div id="ui-content">
+            <p><strong>核心理念：</strong>在离终端5米处的黄金采样点，建立立体监测剖面，精准分析根系环境。</p>
+            
+            <h2><span class="tag tag-air">地上</span>冠层环境</h2>
+            <ul>
+                <li><strong>空气传感器 (+50cm)：</strong>位于叶丛中间，监测高湿环境，预防斑枯病。</li>
+            </ul>
+
+            <h2><span class="tag tag-soil">地下</span>土壤三层剖面</h2>
+            <ul>
+                <li><strong>表层 (-10cm)：</strong>监测蒸发，指导抗旱浇水。</li>
+                <li><strong>核心层 (-20cm)：</strong><strong style="color:#e67e22">块根膨大区</strong>，决定产量的关键层。</li>
+                <li><strong>深层 (-40cm)：</strong>监测渗漏，防止积水烂根。</li>
+            </ul>
+            
+            <p style="border-top:1px solid #eee; padding-top:8px; margin-top:8px;">
+                <strong>🛠️ 施工细节：</strong>所有线缆穿入白色 PVC 管保护，防鼠咬、防锄断。
+            </p>
+        </div>
+    </div>
+
+    <div id="controls-hint">单指拖动旋转 | 双指缩放查看地下</div>
+    <div id="labels-container"></div>
+
+    <script>
+        function togglePanel() {
+            document.getElementById('ui-layer').classList.toggle('collapsed');
+        }
+
+        // === 初始化场景 ===
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef5f9);
+        scene.fog = new THREE.Fog(0xeef5f9, 5, 25);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        if(window.innerWidth < 768) {
+            camera.position.set(3.5, 2.5, 4.5);
+        } else {
+            camera.position.set(3, 2, 4);
+        }
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 + 0.1; // 允许稍微看一点地下
+        controls.target.set(0, 0.5, 0);
+
+        // 灯光
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 5);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        scene.add(dirLight);
+
+        // === 材质 ===
+        const matMetal = new THREE.MeshStandardMaterial({ color: 0xbdc3c7, roughness: 0.3, metalness: 0.5 });
+        const matWhitePlastic = new THREE.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.2 });
+        const matSolar = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.2 });
+        const matSolarCell = new THREE.MeshStandardMaterial({ color: 0x1565c0, roughness: 0.1 });
+        // 土壤半透明
+        const matSoil = new THREE.MeshPhongMaterial({ color: 0x5d4037, transparent: true, opacity: 0.3, shininess: 5, side: THREE.DoubleSide });
+        const matWire = new THREE.MeshBasicMaterial({ color: 0x222222 });
+        const matPVC = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.4 }); // PVC管材质
+        const matLeafFront = new THREE.MeshStandardMaterial({ color: 0x4caf50, side: THREE.FrontSide });
+        
+        // 传感器层级颜色
+        const colorL1 = 0xf1c40f; // -10cm 黄
+        const colorL2 = 0xe67e22; // -20cm 橙 (核心)
+        const colorL3 = 0xe74c3c; // -40cm 红
+
+        // === 1. 地面 ===
+        const ground = new THREE.Mesh(new THREE.BoxGeometry(8, 0.1, 8), matSoil);
+        ground.position.y = -0.05; // 表面在0
+        ground.receiveShadow = true;
+        scene.add(ground);
+        
+        // 地下参考框 (暗示深度)
+        const deepSoil = new THREE.Mesh(new THREE.BoxGeometry(2, 0.6, 2), new THREE.MeshBasicMaterial({color: 0x5d4037, transparent:true, opacity:0.1, wireframe:true}));
+        deepSoil.position.set(0.8, -0.3, 0.8);
+        scene.add(deepSoil);
+
+        const gridHelper = new THREE.GridHelper(8, 16, 0xaaaaaa, 0xcccccc);
+        gridHelper.position.y = 0.01;
+        gridHelper.material.opacity = 0.3;
+        gridHelper.material.transparent = true;
+        scene.add(gridHelper);
+
+        // === 2. 终端立杆系统 (保持顶置摄像头方案) ===
+        const poleGroup = new THREE.Group();
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 2.6, 16), matMetal);
+        pole.position.y = 1.3; pole.castShadow = true;
+        poleGroup.add(pole);
+        
+        // 终端箱
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.45, 0.16), matWhitePlastic);
+        box.position.set(0, 1.5, 0.06); box.castShadow = true;
+        poleGroup.add(box);
+        
+        // 太阳能
+        const solarGroup = new THREE.Group();
+        const solarPanel = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.03, 0.45), matSolar);
+        solarGroup.add(solarPanel, new THREE.Mesh(new THREE.PlaneGeometry(0.61, 0.41), matSolarCell).translateY(0.02).rotateX(-Math.PI/2));
+        solarGroup.rotation.x = Math.PI/5; solarGroup.position.set(0, 2.2, 0);
+        poleGroup.add(solarGroup);
+
+        // 顶置摄像头
+        const camGroup = new THREE.Group();
+        camGroup.add(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.16), matWhitePlastic)); // Body
+        const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.02), new THREE.MeshBasicMaterial({color:0x000}));
+        lens.rotation.x=Math.PI/2; lens.position.z=0.08;
+        camGroup.add(lens);
+        // 遮阳罩
+        const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.22, 16, 1, false, 0, Math.PI), matWhitePlastic);
+        hood.rotation.set(Math.PI/2, Math.PI/2, 0); hood.position.set(0, 0.03, 0.02);
+        camGroup.add(hood);
+        
+        camGroup.position.set(0, 2.7, 0); camGroup.rotation.x = Math.PI/6; camGroup.rotation.y = -Math.PI/4;
+        poleGroup.add(camGroup);
+        scene.add(poleGroup);
+
+        // === 3. 垂直梯度监测点 (核心更新) ===
+        const sensorLoc = new THREE.Vector3(0.8, 0, 0.8); // 采样点位置
+        const sensorGroup = new THREE.Group();
+        sensorGroup.position.copy(sensorLoc);
+
+        // A. 地上部分：空气传感器 (+50cm)
+        // PVC 立柱
+        const pvcStand = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.6), matPVC);
+        pvcStand.position.y = 0.3; // 0 到 0.6m
+        pvcStand.castShadow = true;
+        sensorGroup.add(pvcStand);
+
+        // 传感器本体
+        const airSensor = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.1), matWhitePlastic);
+        for(let i=0; i<3; i++) {
+            const r = new THREE.Mesh(new THREE.TorusGeometry(0.042, 0.003, 4, 12), matWhitePlastic);
+            r.rotation.x=Math.PI/2; r.position.y = -0.02 + i*0.02;
+            airSensor.add(r);
+        }
+        airSensor.position.y = 0.5; // 离地 50cm
+        sensorGroup.add(airSensor);
+
+        // B. 地下部分：3层土壤传感器
+        // 创建探头函数
+        function createProbe(depth, color) {
+            const probe = new THREE.Group();
+            const body = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, 0.1), matWhitePlastic);
+            const pins = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.002, 0.06), new THREE.MeshBasicMaterial({color:0x888888}));
+            pins.position.z = -0.08;
+            
+            // 色环标识深度
+            const tag = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.022, 0.02), new THREE.MeshBasicMaterial({color: color}));
+            tag.position.z = 0.04;
+            
+            probe.add(body, pins, tag);
+            
+            // 侧插式安装：稍微旋转一点
+            probe.position.y = depth;
+            probe.position.x = 0.1; // 离主管一点距离
+            probe.rotation.y = -Math.PI / 2; // 指向侧面
+            return probe;
+        }
+
+        const p1 = createProbe(-0.1, colorL1);
+        const p2 = createProbe(-0.2, colorL2);
+        const p3 = createProbe(-0.4, colorL3);
+        sensorGroup.add(p1, p2, p3);
+
+        // C. PVC 保护管 (地下部分 + 弯头)
+        // 垂直主管
+        const mainPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5), matPVC);
+        mainPipe.position.y = -0.25; // 从 0 到 -0.5
+        sensorGroup.add(mainPipe);
+
+        // 地面弯头
+        const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.025), matPVC);
+        elbow.position.y = 0.05;
+        sensorGroup.add(elbow);
+
+        // 连接线 (从传感器到主管)
+        function connectWire(y) {
+            const line = new THREE.Mesh(new THREE.CylinderGeometry(0.002, 0.002, 0.1), matWire);
+            line.rotation.z = Math.PI/2;
+            line.position.set(0.05, y, 0);
+            return line;
+        }
+        sensorGroup.add(connectWire(-0.1), connectWire(-0.2), connectWire(-0.4));
+
+        scene.add(sensorGroup);
+
+        // === 4. 线缆路由 (PVC 管保护) ===
+        // 从采样点地面弯头 -> 终端箱下方
+        const startPt = sensorLoc.clone().add(new THREE.Vector3(0, 0.05, 0));
+        const endPt = new THREE.Vector3(0, 0.05, 0); // 杆子底部
+        
+        // 创建弯曲的 PVC 管路径
+        const curvePts = [
+            startPt,
+            new THREE.Vector3(startPt.x, 0.05, startPt.z * 0.5), // 地面走线
+            new THREE.Vector3(0.1, 0.05, 0.1), 
+            new THREE.Vector3(0.05, 0.8, 0.05) // 爬杆
+        ];
+        const pipeCurve = new THREE.CatmullRomCurve3(curvePts);
+        const pipeGeo = new THREE.TubeGeometry(pipeCurve, 32, 0.012, 6, false);
+        const protectPipe = new THREE.Mesh(pipeGeo, matPVC);
+        scene.add(protectPipe);
+
+        // === 5. 植株 (为了看清地下，只种少量) ===
+        function createPlant(x, z) {
+            const g = new THREE.Group();
+            for(let i=0; i<6; i++) {
+                const l = new THREE.Mesh(new THREE.CircleGeometry(0.15, 4), matLeafFront);
+                l.rotation.x = -Math.PI/2; l.rotation.z = i; l.position.y = 0.05;
+                l.scale.set(0.5, 1.5, 1);
+                g.add(l);
+            }
+            g.position.set(x, 0, z);
+            return g;
+        }
+        // 避开传感器位置种几株
+        scene.add(createPlant(1.2, 0.8));
+        scene.add(createPlant(0.8, 1.2));
+        scene.add(createPlant(0.4, 0.5));
+
+
+        // === 6. 标签系统 ===
+        const labels = [
+            { text: "① 空气 (+50cm)", pos: sensorLoc.clone().add(new THREE.Vector3(0, 0.6, 0)) },
+            { text: "② 表层土 (-10cm)", pos: sensorLoc.clone().add(new THREE.Vector3(0.2, -0.1, 0)) },
+            { text: "③ 核心层 (-20cm)", pos: sensorLoc.clone().add(new THREE.Vector3(0.2, -0.2, 0)) },
+            { text: "④ 渗漏层 (-40cm)", pos: sensorLoc.clone().add(new THREE.Vector3(0.2, -0.4, 0)) },
+            { text: "PVC 穿线管", pos: new THREE.Vector3(0.4, 0.1, 0.4) }
+        ];
+
+        const labelsContainer = document.getElementById('labels-container');
+        labels.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'label';
+            div.textContent = item.text;
+            labelsContainer.appendChild(div);
+            item.el = div;
+        });
+
+        function updateLabels() {
+            labels.forEach(item => {
+                const screenPos = item.pos.clone().project(camera);
+                if(screenPos.z < 1) {
+                    const x = (screenPos.x * .5 + .5) * window.innerWidth;
+                    const y = (screenPos.y * -.5 + .5) * window.innerHeight;
+                    item.el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+                    item.el.style.opacity = 1;
+                } else {
+                    item.el.style.opacity = 0;
+                }
+            });
+        }
+
+        // === 动画 ===
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            updateLabels();
+            renderer.render(scene, camera);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+
+    </script>
+</body>
+</html>

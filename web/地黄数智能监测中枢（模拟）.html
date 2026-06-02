@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地黄产业数智监测中枢 - 河南工业大学技术支持</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- 引入 Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 引入 Hammer.js (Chart.js Zoom 插件依赖) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js"></script>
+    <!-- 引入 Chart.js Zoom Plugin -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-zoom/2.0.1/chartjs-plugin-zoom.min.js"></script>
+
+    <!-- 配置自定义颜色 -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              haut: {
+                primary: '#1e3a8a',
+                secondary: '#3b82f6',
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    
+    <style>
+        .card-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .fade-in { animation: fadeIn 0.4s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .glass-header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%);
+            position: relative;
+            overflow: hidden;
+        }
+        .glass-header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: radial-gradient(circle at 20% 150%, rgba(255,255,255,0.1) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        
+        /* 下拉菜单动画 */
+        .dropdown-enter {
+            opacity: 0;
+            transform: scale(0.95) translateY(-10px);
+        }
+        .dropdown-enter-active {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+            transition: all 0.2s ease-out;
+        }
+        .dropdown-exit {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+        .dropdown-exit-active {
+            opacity: 0;
+            transform: scale(0.95) translateY(-10px);
+            transition: all 0.2s ease-in;
+            pointer-events: none;
+        }
+        
+        /* 视频播放器模拟样式 */
+        .video-overlay {
+            background: linear-gradient(to top, rgba(0,0,0,0.8) 0%, transparent 40%);
+        }
+        .live-badge {
+            animation: pulse-red 2s infinite;
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
+        /* 自定义开关样式 */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #10b981;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #10b981;
+        }
+    </style>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+    <!-- ================= 顶部导航栏 ================= -->
+    <header class="glass-header text-white shadow-xl z-50">
+        <div class="container mx-auto px-4 py-5">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-4">
+                    <div class="bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/10 shadow-inner">
+                        <i class="fa-solid fa-network-wired text-3xl text-cyan-300"></i>
+                    </div>
+                    <div class="text-center md:text-left">
+                        <h1 class="text-lg md:text-xl font-bold tracking-wider uppercase font-sans text-blue-50">
+                            DIGITAL INTELLIGENCE HUB
+                        </h1>
+                        <div class="flex items-center justify-center md:justify-start gap-2 mt-1">
+                            <span class="text-xs text-blue-300 font-light tracking-wide">Technical Support:</span>
+                            <span class="px-2 py-0.5 bg-white/10 rounded text-xs font-semibold text-yellow-400 border border-white/5">
+                                <i class="fa-solid fa-graduation-cap mr-1"></i>河南工业大学
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="hidden md:block">
+                    <div class="flex flex-col items-end">
+                        <!-- 系统状态指示器 (Header) -->
+                        <div id="sys-status-header" class="inline-flex items-center gap-2 bg-black/20 px-3 py-1.5 rounded-lg border border-white/5 backdrop-blur-md">
+                            <span class="relative flex h-2 w-2">
+                              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                              <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                            </span>
+                            <span class="text-xs font-medium text-blue-100 tracking-wider">SYSTEM ONLINE</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ================= 主要内容区 ================= -->
+    <main class="flex-grow container mx-auto px-4 py-8 max-w-6xl relative">
+
+        <!-- 标题与菜单栏 -->
+        <div class="mb-8 fade-in">
+            <div class="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-4 border-b border-slate-200 pb-6">
+                <div>
+                    <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight flex items-center gap-3 mb-3">
+                        <i class="fa-solid fa-seedling text-green-600"></i>
+                        <span class="bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600">
+                            地黄产业数智监测中枢
+                        </span>
+                    </h2>
+                    
+                    <!-- 交互式模块菜单 -->
+                    <div class="flex flex-wrap items-center gap-2 md:gap-3">
+                        
+                        <!-- 模块一：精准感知 (带下拉菜单) -->
+                        <div class="relative group">
+                            <button onclick="toggleSensingMenu()" class="px-4 py-1.5 bg-blue-50 text-blue-700 text-sm font-bold rounded-full border border-blue-100 flex items-center shadow-sm hover:bg-blue-100 hover:shadow-md transition-all cursor-pointer focus:ring-2 focus:ring-blue-300 focus:outline-none" id="btn-sensing">
+                                <i class="fa-solid fa-bullseye mr-2 text-blue-500"></i>
+                                精准感知 (Precision Sensing)
+                                <i class="fa-solid fa-chevron-down ml-2 text-xs opacity-70 transition-transform duration-200" id="icon-sensing"></i>
+                            </button>
+                            
+                            <!-- 感知下拉菜单 -->
+                            <div id="menu-sensing" class="hidden absolute top-full left-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-20 transform transition-all duration-200 origin-top-left">
+                                <div class="py-1">
+                                    <!-- 新增：综合概览按钮 -->
+                                    <button onclick="switchScenario('sensing_overview')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors flex items-center gap-3 border-b border-slate-100 bg-slate-50/50">
+                                        <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 flex items-center justify-center shadow-sm"><i class="fa-solid fa-border-all"></i></div>
+                                        <div>
+                                            <div class="font-bold">综合概览</div>
+                                            <div class="text-xs text-slate-400">模块首页 / 核心数据</div>
+                                        </div>
+                                    </button>
+                                    
+                                    <button onclick="switchScenario('soil')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-3 border-b border-slate-50">
+                                        <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="fa-solid fa-layer-group"></i></div>
+                                        <div>
+                                            <div class="font-bold">土壤墒情监测</div>
+                                            <div class="text-xs text-slate-400">湿度 / 温度 / EC值</div>
+                                        </div>
+                                    </button>
+                                    <button onclick="switchScenario('weather')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-3 border-b border-slate-50">
+                                        <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center"><i class="fa-solid fa-cloud-sun"></i></div>
+                                        <div>
+                                            <div class="font-bold">田间气象监测</div>
+                                            <div class="text-xs text-slate-400">温湿度 / 光照 / CO2</div>
+                                        </div>
+                                    </button>
+                                    <button onclick="switchScenario('video')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-blue-600 transition-colors flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center"><i class="fa-solid fa-video"></i></div>
+                                        <div>
+                                            <div class="font-bold">视频影像监控</div>
+                                            <div class="text-xs text-slate-400">实时监控 / 延时摄影</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 模块二：智析赋能 (带下拉菜单) -->
+                        <div class="relative group">
+                            <button onclick="toggleAnalysisMenu()" class="px-4 py-1.5 bg-violet-50 text-violet-700 text-sm font-bold rounded-full border border-violet-100 flex items-center shadow-sm hover:bg-violet-100 hover:shadow-md transition-all cursor-pointer focus:ring-2 focus:ring-violet-300 focus:outline-none" id="btn-analysis">
+                                <i class="fa-solid fa-brain mr-2 text-violet-500"></i>
+                                智析赋能 (Smart Analysis)
+                                <i class="fa-solid fa-chevron-down ml-2 text-xs opacity-70 transition-transform duration-200" id="icon-analysis"></i>
+                            </button>
+
+                            <!-- 智析下拉菜单 -->
+                            <div id="menu-analysis" class="hidden absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-20 transform transition-all duration-200 origin-top-left">
+                                <div class="py-1">
+                                    <!-- 新增：综合概览按钮 -->
+                                    <button onclick="switchScenario('analysis_overview')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-violet-50 hover:text-violet-700 transition-colors flex items-center gap-3 border-b border-slate-100 bg-slate-50/50">
+                                        <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 flex items-center justify-center shadow-sm"><i class="fa-solid fa-chart-pie"></i></div>
+                                        <div>
+                                            <div class="font-bold">综合分析概览</div>
+                                            <div class="text-xs text-slate-400">评分 / 风险 / 状态</div>
+                                        </div>
+                                    </button>
+                                    
+                                    <button onclick="switchScenario('analysis_score')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-violet-600 transition-colors flex items-center gap-3 border-b border-slate-50">
+                                        <div class="w-8 h-8 rounded-lg bg-violet-50 text-violet-600 flex items-center justify-center"><i class="fa-solid fa-star-half-stroke"></i></div>
+                                        <div>
+                                            <div class="font-bold">生长环境评分</div>
+                                            <div class="text-xs text-slate-400">适宜度打分 / 限制因子分析</div>
+                                        </div>
+                                    </button>
+                                    <button onclick="switchScenario('analysis_disease')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-red-600 transition-colors flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center"><i class="fa-solid fa-virus-covid"></i></div>
+                                        <div>
+                                            <div class="font-bold">病害风险预警</div>
+                                            <div class="text-xs text-slate-400">根腐病 / 斑枯病风险指数</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 模块三：科学管种 (带下拉菜单) -->
+                        <div class="relative group">
+                             <button onclick="toggleMgmtMenu()" class="px-4 py-1.5 bg-teal-50 text-teal-700 text-sm font-bold rounded-full border border-teal-100 flex items-center shadow-sm hover:bg-teal-100 hover:shadow-md transition-all cursor-pointer focus:ring-2 focus:ring-teal-300 focus:outline-none" id="btn-mgmt">
+                                <i class="fa-solid fa-flask mr-2 text-teal-500"></i>
+                                科学管种 (Scientific Mgmt)
+                                <i class="fa-solid fa-chevron-down ml-2 text-xs opacity-70 transition-transform duration-200" id="icon-mgmt"></i>
+                            </button>
+
+                            <!-- 管种下拉菜单 -->
+                            <div id="menu-mgmt" class="hidden absolute top-full left-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden z-20 transform transition-all duration-200 origin-top-left">
+                                <div class="py-1">
+                                    <!-- 新增：综合概览按钮 -->
+                                    <button onclick="switchScenario('mgmt_overview')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-teal-50 hover:text-teal-700 transition-colors flex items-center gap-3 border-b border-slate-100 bg-slate-50/50">
+                                        <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-500 flex items-center justify-center shadow-sm"><i class="fa-solid fa-server"></i></div>
+                                        <div>
+                                            <div class="font-bold">管种控制台</div>
+                                            <div class="text-xs text-slate-400">设备总览 / 快捷操作</div>
+                                        </div>
+                                    </button>
+                                    
+                                    <button onclick="switchScenario('mgmt_irrigation')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-teal-600 transition-colors flex items-center gap-3 border-b border-slate-50">
+                                        <div class="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center"><i class="fa-solid fa-faucet-drip"></i></div>
+                                        <div>
+                                            <div class="font-bold">智能灌溉控制</div>
+                                            <div class="text-xs text-slate-400">水泵开关 / 阈值设定</div>
+                                        </div>
+                                    </button>
+                                    <button onclick="switchScenario('mgmt_control')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-teal-600 transition-colors flex items-center gap-3 border-b border-slate-50">
+                                        <div class="w-8 h-8 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center"><i class="fa-solid fa-fan"></i></div>
+                                        <div>
+                                            <div class="font-bold">环境调节控制</div>
+                                            <div class="text-xs text-slate-400">排风扇 / 补光灯</div>
+                                        </div>
+                                    </button>
+                                    <button onclick="switchScenario('mgmt_log')" class="w-full text-left px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 hover:text-teal-600 transition-colors flex items-center gap-3">
+                                        <div class="w-8 h-8 rounded-lg bg-lime-50 text-lime-600 flex items-center justify-center"><i class="fa-solid fa-clipboard-list"></i></div>
+                                        <div>
+                                            <div class="font-bold">农事作业档案</div>
+                                            <div class="text-xs text-slate-400">施肥打药记录 / 生长周期</div>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 状态信息 -->
+                <div class="flex flex-col items-end gap-2 w-full lg:w-auto">
+                    <div id="mock-alert" class="hidden w-full lg:w-auto bg-amber-50 border border-amber-200 text-amber-800 px-4 py-2 rounded-lg text-sm flex items-center justify-center lg:justify-start gap-2 shadow-sm">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span>演示模式: 模拟数据中</span>
+                    </div>
+                    
+                    <p class="text-slate-500 text-xs md:text-sm flex items-center gap-3 bg-white px-3 py-1 rounded-full border border-slate-100 shadow-sm">
+                        <span><i class="fa-regular fa-clock mr-1"></i>更新: <span id="last-updated" class="font-mono font-medium text-slate-700">--:--:--</span></span>
+                        <span class="h-3 w-px bg-slate-300"></span>
+                        <!-- 系统状态指示器 (Body) -->
+                        <span id="sys-status-body" class="flex items-center text-green-600 font-medium">
+                            <i class="fa-solid fa-circle text-[8px] mr-1.5"></i>运行正常
+                        </span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ 数据面板视图 (Dashboard) ============ -->
+        <div id="view-dashboard" class="block transition-opacity duration-300">
+            <!-- 动态卡片行 -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <!-- 通用卡片 1 -->
+                <div onclick="setActiveMetric(0)" id="card-0" class="card-transition relative overflow-hidden cursor-pointer bg-white rounded-2xl border-2 border-transparent p-6 hover:shadow-xl hover:-translate-y-1 group">
+                    <div class="flex flex-col items-center gap-3 relative z-10">
+                        <div id="bg-icon-0" class="w-12 h-12 rounded-full flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                             <i id="icon-0" class="fa-solid fa-minus text-2xl"></i>
+                        </div>
+                        <div id="label-0" class="text-slate-500 font-bold text-xs uppercase tracking-widest">--</div>
+                        <div class="text-4xl font-bold text-slate-800 font-mono flex items-baseline text-center justify-center w-full">
+                            <span id="val-0">--</span><span id="unit-0" class="text-lg text-slate-400 ml-1 font-sans"></span>
+                        </div>
+                    </div>
+                    <div id="decor-0" class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500"></div>
+                </div>
+
+                <!-- 通用卡片 2 -->
+                <div onclick="setActiveMetric(1)" id="card-1" class="card-transition relative overflow-hidden cursor-pointer bg-white rounded-2xl border-2 border-transparent p-6 hover:shadow-xl hover:-translate-y-1 group">
+                    <div class="flex flex-col items-center gap-3 relative z-10">
+                        <div id="bg-icon-1" class="w-12 h-12 rounded-full flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                            <i id="icon-1" class="fa-solid fa-minus text-2xl"></i>
+                        </div>
+                        <div id="label-1" class="text-slate-500 font-bold text-xs uppercase tracking-widest">--</div>
+                        <div class="text-4xl font-bold text-slate-800 font-mono flex items-baseline text-center justify-center w-full">
+                            <span id="val-1">--</span><span id="unit-1" class="text-lg text-slate-400 ml-1 font-sans"></span>
+                        </div>
+                    </div>
+                     <div id="decor-1" class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500"></div>
+                </div>
+
+                <!-- 通用卡片 3 -->
+                <div onclick="setActiveMetric(2)" id="card-2" class="card-transition relative overflow-hidden cursor-pointer bg-white rounded-2xl border-2 border-transparent p-6 hover:shadow-xl hover:-translate-y-1 group">
+                    <div class="flex flex-col items-center gap-3 relative z-10">
+                        <div id="bg-icon-2" class="w-12 h-12 rounded-full flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+                            <i id="icon-2" class="fa-solid fa-minus text-2xl"></i>
+                        </div>
+                        <div id="label-2" class="text-slate-500 font-bold text-xs uppercase tracking-widest">--</div>
+                        <div class="text-4xl font-bold text-slate-800 font-mono flex items-baseline text-center justify-center w-full">
+                            <span id="val-2">--</span><span id="unit-2" class="text-lg text-slate-400 ml-1 font-sans"></span>
+                        </div>
+                    </div>
+                     <div id="decor-2" class="absolute -right-6 -bottom-6 w-24 h-24 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500"></div>
+                </div>
+            </div>
+
+            <!-- 混合显示区域：图表 或 控制面板 -->
+            <div class="bg-white rounded-2xl shadow-lg shadow-slate-200/50 border border-slate-100 p-6 md:p-8 relative overflow-hidden">
+                <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-80"></div>
+
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <span id="chart-indicator" class="w-1 h-6 rounded bg-slate-600 block transition-colors"></span>
+                            <span id="chart-title">趋势分析</span>
+                        </h3>
+                        <p class="text-slate-400 text-xs ml-3 mt-1" id="chart-subtitle">基于过去 24 小时的实时监控数据</p>
+                    </div>
+                    
+                    <div class="flex items-center gap-3">
+                        <button onclick="exportCSV()" class="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm active:scale-95">
+                            <i class="fa-solid fa-download"></i>
+                            <span>导出数据</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="relative w-full h-[380px]">
+                    <!-- 1. 折线图 (默认显示) -->
+                    <canvas id="myChart" class="transition-opacity duration-300"></canvas>
+                    
+                    <!-- 2. 控制面板 (管理模式显示) -->
+                    <div id="panel-controls" class="hidden absolute inset-0 bg-white z-10 overflow-y-auto pr-2 fade-in">
+                        <!-- 内容通过 JS 动态注入 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ 视频监控视图 (Video Monitoring) ============ -->
+        <div id="view-video" class="hidden fade-in">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- 主摄像头 -->
+                <div class="lg:col-span-2 bg-black rounded-2xl overflow-hidden shadow-2xl relative group">
+                    <div class="absolute top-4 left-4 z-10 flex gap-2">
+                        <div class="bg-red-600 text-white text-xs font-bold px-2 py-1 rounded flex items-center gap-1 live-badge">
+                            <i class="fa-solid fa-circle text-[8px]"></i> LIVE
+                        </div>
+                        <div class="bg-black/50 text-white text-xs px-2 py-1 rounded backdrop-blur-md border border-white/10">
+                            CAM-01: 种植基地 A 区全景
+                        </div>
+                    </div>
+                    <!-- 模拟视频画面 (使用静态图代替) -->
+                    <div class="aspect-video bg-slate-800 flex items-center justify-center relative overflow-hidden">
+                        <!-- 这里可以是真实的 img 或 video 标签 -->
+                        <div class="absolute inset-0 bg-gradient-to-b from-transparent to-black/60 z-10 video-overlay"></div>
+                        <i class="fa-solid fa-leaf text-9xl text-slate-700 opacity-20"></i>
+                        <div class="absolute bottom-6 left-6 z-20 text-white">
+                            <div class="text-2xl font-bold">基地实时画面</div>
+                            <div class="text-sm text-slate-300">2026-05-12 14:30:25</div>
+                        </div>
+                        
+                         <!-- 模拟的控制条 -->
+                         <div class="absolute bottom-4 right-4 z-20 flex gap-3">
+                            <button class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur text-white flex items-center justify-center transition-all"><i class="fa-solid fa-expand"></i></button>
+                            <button class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 backdrop-blur text-white flex items-center justify-center transition-all"><i class="fa-solid fa-camera"></i></button>
+                         </div>
+                    </div>
+                </div>
+
+                <!-- 侧边栏：延时摄影与状态 -->
+                <div class="flex flex-col gap-6">
+                    <!-- 延时摄影卡片 -->
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-clock-rotate-left text-blue-500"></i> 生长延时摄影
+                        </h3>
+                        <div class="relative rounded-xl overflow-hidden bg-slate-100 aspect-video mb-3 cursor-pointer group">
+                             <div class="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/30 transition-all">
+                                 <div class="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-lg transform group-hover:scale-110 transition-all">
+                                     <i class="fa-solid fa-play text-blue-600 ml-1"></i>
+                                 </div>
+                             </div>
+                             <!-- 模拟缩略图 -->
+                             <div class="w-full h-full bg-gradient-to-br from-emerald-100 to-emerald-200 flex items-center justify-center text-emerald-800 font-mono text-xs">
+                                 Timelapse Preview
+                             </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-slate-500">
+                            <span>周期: 30天</span>
+                            <span>生成于: 2小时前</span>
+                        </div>
+                    </div>
+
+                    <!-- 智能预警 (Mock) -->
+                    <div class="bg-red-50 rounded-2xl p-5 border border-red-100">
+                         <h3 class="font-bold text-red-800 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-bell"></i> 实时监控告警
+                        </h3>
+                        <ul class="space-y-3">
+                            <li class="flex items-start gap-3 text-sm text-slate-700 bg-white p-3 rounded-lg shadow-sm border border-red-100">
+                                <i class="fa-solid fa-triangle-exclamation text-red-500 mt-0.5"></i>
+                                <div>
+                                    <div class="font-bold text-slate-800">检测到叶片倒伏风险</div>
+                                    <div class="text-xs text-slate-500 mt-1">区域 B2 - 10分钟前</div>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 页脚 -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-10 mt-8 text-slate-400">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col lg:flex-row justify-between items-center lg:items-start gap-8 text-center lg:text-left">
+                <div class="lg:w-1/3">
+                    <h4 class="text-white font-bold text-xl mb-2 tracking-wide">HAUT Industry Innovation Hub</h4>
+                    <p class="text-xs text-slate-500 uppercase tracking-wider leading-relaxed">
+                        Intelligent Analysis & Scientific Management System
+                    </p>
+                </div>
+                
+                <div class="lg:w-2/3 flex flex-col items-center lg:items-end gap-4">
+                    <p class="text-sm font-medium">
+                        © <script>document.write(new Date().getFullYear())</script> 
+                        <a href="https://www.haut.edu.cn/" target="_blank" class="text-slate-200 hover:text-white transition-colors cursor-pointer hover:underline decoration-slate-500 hover:decoration-white underline-offset-2">Henan University of Technology</a>. 
+                        All Rights Reserved.
+                    </p>
+                    
+                    <div class="text-xs text-slate-500 flex flex-col items-center lg:items-end gap-1.5 leading-relaxed max-w-2xl">
+                        <div class="flex flex-wrap justify-center lg:justify-end gap-x-2 gap-y-1">
+                            <span>School of Artificial Intelligence and Big Data</span>
+                            <span class="hidden sm:inline text-slate-700">•</span>
+                            <span>Department of Information Engineering</span>
+                        </div>
+                        <div class="text-slate-600 font-medium bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700/50">
+                            Artificial Intelligence and Big Data Research & Innovation Laboratory
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ================= JavaScript 逻辑 ================= -->
+    <script>
+        // 🔴 配置与状态管理
+        const USE_MOCK_DATA = true; 
+        const API_BASE_URL = "http://YOUR_CPOLAR_URL_HERE"; 
+
+        // 全局状态
+        let currentScenario = 'weather'; 
+        let activeMetricIndex = 0;       
+        let myChart = null;
+        let historyDataCache = null;
+        
+        // 控制面板状态 (Mock)
+        let deviceState = {
+            pump: false,
+            fan: true,
+            light: false,
+            irrigationThreshold: 30
+        };
+
+        // 场景配置定义 (核心数据结构)
+        const SCENARIOS = {
+            // --- 综合概览视图 (New Default Views) ---
+            'sensing_overview': {
+                cards: [
+                    { id: 'soil_hum', label: '核心指标：土壤湿度', unit: '%', color: '#0891b2', bgColor: 'bg-cyan-50', icon: 'fa-water', borderColor: 'border-cyan-500', iconColor: 'text-cyan-600', ring: 'ring-cyan-200' },
+                    { id: 'air_temp', label: '环境：空气温度', unit: '°C', color: '#ef4444', bgColor: 'bg-red-50', icon: 'fa-temperature-high', borderColor: 'border-red-500', iconColor: 'text-red-500', ring: 'ring-red-200' },
+                    { id: 'light',    label: '环境：光照强度', unit: 'Lux',color: '#f59e0b', bgColor: 'bg-amber-50', icon: 'fa-sun', borderColor: 'border-amber-500', iconColor: 'text-amber-500', ring: 'ring-amber-200' }
+                ]
+            },
+            'analysis_overview': {
+                cards: [
+                    { id: 'env_score', label: '综合评分', unit: '分', color: '#8b5cf6', bgColor: 'bg-violet-50', icon: 'fa-star', borderColor: 'border-violet-500', iconColor: 'text-violet-600', ring: 'ring-violet-200' },
+                    { id: 'risk_root', label: '首要风险：根腐病', unit: '', color: '#ef4444', bgColor: 'bg-red-50', icon: 'fa-biohazard', borderColor: 'border-red-500', iconColor: 'text-red-600', ring: 'ring-red-200' },
+                    { id: 'growth_stage', label: '当前生长阶段', unit: '', color: '#10b981', bgColor: 'bg-emerald-50', icon: 'fa-seedling', borderColor: 'border-emerald-500', iconColor: 'text-emerald-600', ring: 'ring-emerald-200' }
+                ]
+            },
+            'mgmt_overview': {
+                cards: [
+                    { id: 'pump_status', label: '灌溉水泵', unit: '', color: '#0d9488', bgColor: 'bg-teal-50', icon: 'fa-power-off', borderColor: 'border-teal-500', iconColor: 'text-teal-600', ring: 'ring-teal-200' },
+                    { id: 'fan_status', label: '通风系统', unit: '', color: '#0d9488', bgColor: 'bg-teal-50', icon: 'fa-fan', borderColor: 'border-teal-500', iconColor: 'text-teal-600', ring: 'ring-teal-200' },
+                    { id: 'next_action', label: '待办农事', unit: '', color: '#3b82f6', bgColor: 'bg-blue-50', icon: 'fa-list-check', borderColor: 'border-blue-500', iconColor: 'text-blue-600', ring: 'ring-blue-200' }
+                ]
+            },
+
+            // --- 监测模块 ---
+            'weather': {
+                cards: [
+                    { id: 'air_temp', label: '空气温度', unit: '°C', color: '#ef4444', bgColor: 'bg-red-50', icon: 'fa-temperature-high', borderColor: 'border-red-500', iconColor: 'text-red-500', ring: 'ring-red-200' },
+                    { id: 'air_hum',  label: '空气湿度', unit: '%',  color: '#3b82f6', bgColor: 'bg-blue-50', icon: 'fa-droplet', borderColor: 'border-blue-500', iconColor: 'text-blue-500', ring: 'ring-blue-200' },
+                    { id: 'light',    label: '光照强度', unit: 'Lux',color: '#f59e0b', bgColor: 'bg-amber-50', icon: 'fa-sun', borderColor: 'border-amber-500', iconColor: 'text-amber-500', ring: 'ring-amber-200' }
+                ]
+            },
+            'soil': {
+                cards: [
+                    { id: 'soil_hum', label: '土壤湿度', unit: '% (VWC)', color: '#0891b2', bgColor: 'bg-cyan-50', icon: 'fa-water', borderColor: 'border-cyan-500', iconColor: 'text-cyan-600', ring: 'ring-cyan-200' },
+                    { id: 'soil_temp',label: '土壤温度', unit: '°C',     color: '#ea580c', bgColor: 'bg-orange-50', icon: 'fa-temperature-low', borderColor: 'border-orange-500', iconColor: 'text-orange-600', ring: 'ring-orange-200' },
+                    { id: 'soil_ec',  label: '土壤电导率', unit: 'uS/cm', color: '#059669', bgColor: 'bg-emerald-50', icon: 'fa-bolt', borderColor: 'border-emerald-500', iconColor: 'text-emerald-600', ring: 'ring-emerald-200' }
+                ]
+            },
+            // --- 智析模块 ---
+            'analysis_score': {
+                cards: [
+                    { id: 'env_score', label: '适宜度打分', unit: '分', color: '#8b5cf6', bgColor: 'bg-violet-50', icon: 'fa-star', borderColor: 'border-violet-500', iconColor: 'text-violet-600', ring: 'ring-violet-200' },
+                    { id: 'limit_factor', label: '当前短板', unit: '', color: '#f43f5e', bgColor: 'bg-rose-50', icon: 'fa-triangle-exclamation', borderColor: 'border-rose-500', iconColor: 'text-rose-600', ring: 'ring-rose-200' },
+                    { id: 'growth_stage', label: '当前生长阶段', unit: '', color: '#10b981', bgColor: 'bg-emerald-50', icon: 'fa-seedling', borderColor: 'border-emerald-500', iconColor: 'text-emerald-600', ring: 'ring-emerald-200' }
+                ]
+            },
+            'analysis_disease': {
+                cards: [
+                    { id: 'risk_root', label: '根腐病风险', unit: '', color: '#ef4444', bgColor: 'bg-red-50', icon: 'fa-biohazard', borderColor: 'border-red-500', iconColor: 'text-red-600', ring: 'ring-red-200' },
+                    { id: 'risk_spot', label: '斑枯病风险', unit: '', color: '#f97316', bgColor: 'bg-orange-50', icon: 'fa-viruses', borderColor: 'border-orange-500', iconColor: 'text-orange-600', ring: 'ring-orange-200' },
+                    { id: 'suggestion', label: '防治建议', unit: '', color: '#3b82f6', bgColor: 'bg-blue-50', icon: 'fa-user-doctor', borderColor: 'border-blue-500', iconColor: 'text-blue-600', ring: 'ring-blue-200' }
+                ]
+            },
+            // --- 管种模块 ---
+            'mgmt_irrigation': {
+                cards: [
+                    { id: 'pump_status', label: '水泵状态', unit: '', color: '#0d9488', bgColor: 'bg-teal-50', icon: 'fa-power-off', borderColor: 'border-teal-500', iconColor: 'text-teal-600', ring: 'ring-teal-200' },
+                    { id: 'soil_hum', label: '参考：土壤湿度', unit: '%', color: '#0891b2', bgColor: 'bg-cyan-50', icon: 'fa-water', borderColor: 'border-cyan-500', iconColor: 'text-cyan-600', ring: 'ring-cyan-200' },
+                    { id: 'irrigation_mode', label: '控制模式', unit: '', color: '#64748b', bgColor: 'bg-slate-50', icon: 'fa-sliders', borderColor: 'border-slate-500', iconColor: 'text-slate-600', ring: 'ring-slate-200' }
+                ]
+            },
+            'mgmt_control': {
+                cards: [
+                    { id: 'fan_status', label: '排风扇状态', unit: '', color: '#0d9488', bgColor: 'bg-teal-50', icon: 'fa-fan', borderColor: 'border-teal-500', iconColor: 'text-teal-600', ring: 'ring-teal-200' },
+                    { id: 'light_status', label: '补光灯状态', unit: '', color: '#f59e0b', bgColor: 'bg-amber-50', icon: 'fa-lightbulb', borderColor: 'border-amber-500', iconColor: 'text-amber-600', ring: 'ring-amber-200' },
+                    { id: 'air_temp', label: '参考：温度', unit: '°C', color: '#ef4444', bgColor: 'bg-red-50', icon: 'fa-temperature-high', borderColor: 'border-red-500', iconColor: 'text-red-500', ring: 'ring-red-200' }
+                ]
+            },
+            'mgmt_log': {
+                cards: [
+                    { id: 'days_planted', label: '种植天数', unit: '天', color: '#65a30d', bgColor: 'bg-lime-50', icon: 'fa-calendar-day', borderColor: 'border-lime-500', iconColor: 'text-lime-600', ring: 'ring-lime-200' },
+                    { id: 'growth_stage', label: '生长阶段', unit: '', color: '#10b981', bgColor: 'bg-emerald-50', icon: 'fa-seedling', borderColor: 'border-emerald-500', iconColor: 'text-emerald-600', ring: 'ring-emerald-200' },
+                    { id: 'next_action', label: '下一次作业', unit: '', color: '#3b82f6', bgColor: 'bg-blue-50', icon: 'fa-list-check', borderColor: 'border-blue-500', iconColor: 'text-blue-600', ring: 'ring-blue-200' }
+                ]
+            }
+        };
+
+        // NEW: 场景显示配置，用于导航栏状态更新
+        // isOverview: true 表示这是主入口，不需要显示面包屑的“| 子菜单”部分
+        const SCENARIO_DISPLAY = {
+            'sensing_overview': { title: '综合概览', parent: 'sensing', icon: 'fa-border-all', color: 'text-blue-600', isOverview: true },
+            'soil': { title: '土壤墒情', parent: 'sensing', icon: 'fa-layer-group', color: 'text-emerald-600' },
+            'weather': { title: '田间气象', parent: 'sensing', icon: 'fa-cloud-sun', color: 'text-blue-500' },
+            'video': { title: '视频监控', parent: 'sensing', icon: 'fa-video', color: 'text-purple-500' },
+            
+            'analysis_overview': { title: '分析概览', parent: 'analysis', icon: 'fa-chart-pie', color: 'text-violet-600', isOverview: true },
+            'analysis_score': { title: '环境评分', parent: 'analysis', icon: 'fa-star-half-stroke', color: 'text-violet-600' },
+            'analysis_disease': { title: '病害预警', parent: 'analysis', icon: 'fa-virus-covid', color: 'text-red-600' },
+            
+            'mgmt_overview': { title: '管种控制台', parent: 'mgmt', icon: 'fa-server', color: 'text-teal-600', isOverview: true },
+            'mgmt_irrigation': { title: '智能灌溉', parent: 'mgmt', icon: 'fa-faucet-drip', color: 'text-teal-600' },
+            'mgmt_control': { title: '环境调节', parent: 'mgmt', icon: 'fa-fan', color: 'text-cyan-600' },
+            'mgmt_log': { title: '农事档案', parent: 'mgmt', icon: 'fa-clipboard-list', color: 'text-lime-600' }
+        };
+
+        // --- Mock 数据生成器 (扩展) ---
+        function generateMockRealtime() {
+            // 基础传感器数据
+            const soilHum = (35 + Math.random() * 3).toFixed(1);
+            const soilTemp = (18 + Math.random() * 1).toFixed(1);
+            const light = Math.floor(8000 + Math.random() * 500);
+
+            // 智析逻辑
+            let score = 95;
+            let factors = "无明显短板";
+            if (soilHum > 38) { score -= 15; factors = "土壤湿度过高"; }
+            else if (light < 5000) { score -= 20; factors = "光照不足"; }
+            
+            // 风险逻辑
+            const rootRisk = soilHum > 37 ? "高风险" : "低风险";
+            
+            // 管种逻辑 (状态)
+            const pumpText = deviceState.pump ? "运行中" : "已停止";
+            const fanText = deviceState.fan ? "开启" : "关闭";
+            const lightText = deviceState.light ? "开启" : "关闭";
+
+            return {
+                // Weather
+                air_temp: (22 + Math.random() * 2).toFixed(1),
+                air_hum: Math.floor(55 + Math.random() * 10),
+                light: light, 
+                // Soil
+                soil_hum: soilHum,
+                soil_temp: soilTemp,
+                soil_ec: Math.floor(200 + Math.random() * 20),
+                // Analysis
+                env_score: score,
+                limit_factor: factors,
+                growth_stage: "块茎膨大期",
+                risk_root: rootRisk,
+                risk_spot: "低风险",
+                suggestion: "环境适宜",
+                // Management Status
+                pump_status: pumpText,
+                irrigation_mode: "自动模式",
+                fan_status: fanText,
+                light_status: lightText,
+                days_planted: 128,
+                next_action: "追肥 (3天后)",
+
+                timestamp: new Date().toLocaleTimeString('zh-CN', { hour12: false })
+            };
+        }
+
+        function generateMockHistory() {
+            const count = 12;
+            const now = new Date();
+            const data = {
+                time: [],
+                air_temp: [], air_hum: [], light: [],
+                soil_hum: [], soil_temp: [], soil_ec: [],
+                // Placeholders for non-chart scenarios
+                pump_status: [], fan_status: []
+            };
+
+            for(let i=count-1; i>=0; i--) {
+                const t = new Date(now.getTime() - i * 60 * 60 * 1000);
+                data.time.push(`${t.getHours()}:00`);
+                data.air_temp.push(20 + Math.sin(i)*5 + Math.random()*2);
+                data.soil_hum.push(35 + Math.sin(i*0.5)*2 + Math.random());
+            }
+            return data;
+        }
+
+        // --- 交互逻辑 ---
+        
+        // 1. 菜单控制 (Updated with Animations)
+        const menuTimeouts = {};
+
+        function toggleSensingMenu() { toggleMenu('menu-sensing', 'icon-sensing'); closeMenu('menu-analysis', 'icon-analysis'); closeMenu('menu-mgmt', 'icon-mgmt'); }
+        function toggleAnalysisMenu() { toggleMenu('menu-analysis', 'icon-analysis'); closeMenu('menu-sensing', 'icon-sensing'); closeMenu('menu-mgmt', 'icon-mgmt'); }
+        function toggleMgmtMenu() { toggleMenu('menu-mgmt', 'icon-mgmt'); closeMenu('menu-sensing', 'icon-sensing'); closeMenu('menu-analysis', 'icon-analysis'); }
+
+        function toggleMenu(menuId, iconId) {
+            const menu = document.getElementById(menuId);
+            const icon = document.getElementById(iconId);
+            
+            // Cancel pending close if any
+            if (menuTimeouts[menuId]) {
+                clearTimeout(menuTimeouts[menuId]);
+                delete menuTimeouts[menuId];
+            }
+
+            const isHidden = menu.classList.contains('hidden');
+            
+            if (isHidden || menu.classList.contains('dropdown-exit-active')) {
+                // OPEN
+                menu.classList.remove('hidden');
+                menu.classList.remove('dropdown-exit', 'dropdown-exit-active');
+                
+                menu.classList.add('dropdown-enter');
+                // Force reflow
+                void menu.offsetWidth;
+                menu.classList.add('dropdown-enter-active');
+                menu.classList.remove('dropdown-enter');
+                
+                // Cleanup after animation
+                menuTimeouts[menuId] = setTimeout(() => {
+                    menu.classList.remove('dropdown-enter-active');
+                    delete menuTimeouts[menuId];
+                }, 200);
+
+                if(icon) icon.style.transform = 'rotate(180deg)';
+                
+            } else {
+                // CLOSE
+                closeMenu(menuId, iconId);
+            }
+        }
+
+        function closeMenu(menuId, iconId) {
+            const menu = document.getElementById(menuId);
+            const icon = document.getElementById(iconId);
+            
+            if (!menu || menu.classList.contains('hidden')) return;
+            
+            // Cancel pending open cleanup if any
+            if (menuTimeouts[menuId]) {
+                clearTimeout(menuTimeouts[menuId]);
+            }
+
+            // Start Exit Animation
+            menu.classList.add('dropdown-exit');
+            void menu.offsetWidth;
+            menu.classList.add('dropdown-exit-active');
+            menu.classList.remove('dropdown-exit');
+            menu.classList.remove('dropdown-enter-active'); // ensure no conflict
+
+            if(icon) icon.style.transform = 'rotate(0deg)';
+
+            // Hide after animation
+            menuTimeouts[menuId] = setTimeout(() => {
+                menu.classList.add('hidden');
+                menu.classList.remove('dropdown-exit-active');
+                delete menuTimeouts[menuId];
+            }, 200);
+        }
+        
+        document.addEventListener('click', function(event) {
+            // Close menus if clicking outside
+            ['sensing', 'analysis', 'mgmt'].forEach(type => {
+                const btn = document.getElementById(`btn-${type}`);
+                const menu = document.getElementById(`menu-${type}`);
+                if (btn && menu && !btn.contains(event.target) && !menu.contains(event.target)) {
+                    closeMenu(`menu-${type}`, `icon-${type}`);
+                }
+            });
+        });
+
+        // 2. 场景切换
+        function switchScenario(scenario) {
+            currentScenario = scenario;
+            activeMetricIndex = 0; 
+            
+            // 关闭所有菜单
+            ['sensing', 'analysis', 'mgmt'].forEach(type => closeMenu(`menu-${type}`, `icon-${type}`));
+
+            // 更新导航按钮状态
+            updateNavButtons(scenario);
+
+            // 视图切换逻辑
+            const dashView = document.getElementById('view-dashboard');
+            const videoView = document.getElementById('view-video');
+            
+            if (scenario === 'video') {
+                dashView.classList.add('hidden');
+                videoView.classList.remove('hidden');
+            } else {
+                videoView.classList.add('hidden');
+                dashView.classList.remove('hidden');
+                
+                // 处理“管理”模式 vs “监测/分析”模式
+                const isMgmt = scenario.startsWith('mgmt') && !scenario.includes('overview'); // mgmt_overview 使用图表视图
+                const chartCanvas = document.getElementById('myChart');
+                const controlPanel = document.getElementById('panel-controls');
+                const titleEl = document.getElementById('chart-title');
+                const subTitleEl = document.getElementById('chart-subtitle');
+
+                if (isMgmt) {
+                    // 进入管理模式子菜单：隐藏图表，显示控制面板
+                    chartCanvas.classList.add('hidden');
+                    controlPanel.classList.remove('hidden');
+                    
+                    // 渲染控制面板内容
+                    renderControlPanel(scenario);
+
+                    // 调整标题
+                    const config = SCENARIOS[scenario].cards[0]; 
+                    titleEl.innerText = "智能设备控制中心 & 农事档案";
+                    titleEl.style.color = config.color;
+                    subTitleEl.innerText = "实时设备交互与数据录入";
+                    document.getElementById('chart-indicator').style.backgroundColor = config.color;
+
+                } else {
+                    // 回到监测/分析模式或概览模式：显示图表，隐藏控制面板
+                    chartCanvas.classList.remove('hidden');
+                    controlPanel.classList.add('hidden');
+                    subTitleEl.innerText = "基于过去 24 小时的实时监控数据";
+                }
+
+                updateDashboardUI(); 
+                fetchRealtime();     
+                // 对于 overview 模式，我们也渲染图表
+                if (!isMgmt) renderChartFromCache();
+            }
+        }
+
+        // 更新导航按钮显示状态
+        function updateNavButtons(activeScenario) {
+            const displayInfo = SCENARIO_DISPLAY[activeScenario];
+            if (!displayInfo) return;
+
+            const parents = {
+                'sensing': { 
+                    id: 'btn-sensing', 
+                    defaultHtml: '<i class="fa-solid fa-bullseye mr-2 text-blue-500"></i>精准感知 (Precision Sensing)<i class="fa-solid fa-chevron-down ml-2 text-xs opacity-70 transition-transform duration-200" id="icon-sensing"></i>',
+                    activeLabel: '精准感知',
+                    baseIcon: 'fa-bullseye',
+                    baseColor: 'text-blue-500',
+                    activeBg: 'bg-blue-100',
+                    defaultBg: 'bg-blue-50'
+                },
+                'analysis': { 
+                    id: 'btn-analysis', 
+                    defaultHtml: '<i class="fa-solid fa-brain mr-2 text-violet-500"></i>智析赋能 (Smart Analysis)<i class="fa-solid fa-chevron-down ml-2 text-xs opacity-70 transition-transform duration-200" id="icon-analysis"></i>',
+                    activeLabel: '智析赋能',
+                    baseIcon: 'fa-brain',
+                    baseColor: 'text-violet-500',
+                    activeBg: 'bg-violet-100',
+                    defaultBg: 'bg-violet-50'
+                },
+                'mgmt': { 
+                    id: 'btn-mgmt', 
+                    defaultHtml: '<i class="fa-solid fa-flask mr-2 text-teal-500"></i>科学管种 (Scientific Mgmt)<i class="fa-solid fa-chevron-down ml-2 text-xs opacity-70 transition-transform duration-200" id="icon-mgmt"></i>',
+                    activeLabel: '科学管种',
+                    baseIcon: 'fa-flask',
+                    baseColor: 'text-teal-500',
+                    activeBg: 'bg-teal-100',
+                    defaultBg: 'bg-teal-50'
+                }
+            };
+
+            Object.keys(parents).forEach(key => {
+                const p = parents[key];
+                const btn = document.getElementById(p.id);
+                
+                if (key === displayInfo.parent) {
+                    // Active state
+                    btn.className = `px-4 py-1.5 text-sm font-bold rounded-full border border-transparent flex items-center shadow-md transition-all cursor-pointer focus:outline-none ring-2 ring-offset-1 ring-opacity-60 ${p.activeBg}`;
+                    if (key === 'sensing') btn.classList.add('text-blue-800', 'ring-blue-300');
+                    if (key === 'analysis') btn.classList.add('text-violet-800', 'ring-violet-300');
+                    if (key === 'mgmt') btn.classList.add('text-teal-800', 'ring-teal-300');
+
+                    // 关键逻辑：如果是Overview模式，不显示子菜单标签
+                    if (displayInfo.isOverview) {
+                         btn.innerHTML = `
+                            <i class="fa-solid ${p.baseIcon} mr-2 ${p.baseColor}"></i>
+                            <span>${p.activeLabel}</span>
+                            <i class="fa-solid fa-chevron-down ml-2 text-xs opacity-70 transition-transform duration-200" id="icon-${key}"></i>
+                        `;
+                    } else {
+                        btn.innerHTML = `
+                            <i class="fa-solid ${p.baseIcon} mr-2 ${p.baseColor}"></i>
+                            <span>${p.activeLabel}</span>
+                            <span class="mx-2 text-slate-400 font-light">|</span>
+                            <i class="fa-solid ${displayInfo.icon} mr-1.5 ${displayInfo.color}"></i>
+                            <span class="${displayInfo.color}">${displayInfo.title}</span>
+                            <i class="fa-solid fa-chevron-down ml-2 text-xs opacity-70 transition-transform duration-200" id="icon-${key}"></i>
+                        `;
+                    }
+                    
+                    // 确保旋转图标正确复位
+                    const icon = document.getElementById(`icon-${key}`);
+                    if(icon) icon.style.transform = 'rotate(0deg)';
+                } else {
+                    // Default state
+                    btn.className = `px-4 py-1.5 text-sm font-bold rounded-full border flex items-center shadow-sm hover:shadow-md transition-all cursor-pointer focus:outline-none ${p.defaultBg}`;
+                    if (key === 'sensing') btn.classList.add('text-blue-700', 'border-blue-100', 'hover:bg-blue-100');
+                    if (key === 'analysis') btn.classList.add('text-violet-700', 'border-violet-100', 'hover:bg-violet-100');
+                    if (key === 'mgmt') btn.classList.add('text-teal-700', 'border-teal-100', 'hover:bg-teal-100');
+
+                    btn.innerHTML = p.defaultHtml;
+                }
+            });
+        }
+
+        // 3. 渲染控制面板 (New)
+        function renderControlPanel(scenario) {
+            const panel = document.getElementById('panel-controls');
+            let content = '';
+
+            if (scenario === 'mgmt_irrigation') {
+                content = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
+                        <div class="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                            <h4 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-solid fa-hand-pointer mr-2 text-teal-500"></i> 手动控制</h4>
+                            <div class="flex items-center justify-between mb-4">
+                                <span class="text-sm font-medium">主水泵开关</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer" ${deviceState.pump ? 'checked' : ''} onchange="toggleDevice('pump')">
+                                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-teal-500"></div>
+                                </label>
+                            </div>
+                            <p class="text-xs text-slate-400">点击开关可立即启动或停止灌溉系统。</p>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                             <h4 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-solid fa-gears mr-2 text-teal-500"></i> 自动阈值设定</h4>
+                             <div class="flex items-center gap-3 mb-3">
+                                <span class="text-sm">土壤湿度低于</span>
+                                <input type="number" value="${deviceState.irrigationThreshold}" class="w-16 px-2 py-1 border border-slate-300 rounded text-center font-mono text-sm focus:ring-2 focus:ring-teal-500 focus:outline-none" onchange="deviceState.irrigationThreshold = this.value">
+                                <span class="text-sm">% 时自动开启</span>
+                             </div>
+                             <button onclick="alert('设置已保存')" class="w-full bg-teal-600 text-white py-2 rounded-lg text-sm hover:bg-teal-700 transition-colors">保存设置</button>
+                        </div>
+                    </div>
+                `;
+            } else if (scenario === 'mgmt_control') {
+                content = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-2">
+                        <div class="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                            <h4 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-solid fa-wind mr-2 text-cyan-500"></i> 通风系统</h4>
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium">排风扇 / 通风口</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer" ${deviceState.fan ? 'checked' : ''} onchange="toggleDevice('fan')">
+                                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
+                                </label>
+                            </div>
+                            <div class="text-xs text-slate-500 mt-2 bg-white p-2 rounded border border-slate-100">当前环境温湿度适宜，建议开启通风以保持空气流通。</div>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl p-5 border border-slate-200">
+                             <h4 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-regular fa-sun mr-2 text-amber-500"></i> 补光系统</h4>
+                             <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium">生长补光灯</span>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer" ${deviceState.light ? 'checked' : ''} onchange="toggleDevice('light')">
+                                    <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                                </label>
+                            </div>
+                             <div class="text-xs text-slate-500 mt-2 bg-white p-2 rounded border border-slate-100">今日自然光照充足，可关闭补光灯节能。</div>
+                        </div>
+                    </div>
+                `;
+            } else if (scenario === 'mgmt_log') {
+                content = `
+                    <div class="p-2">
+                        <div class="overflow-x-auto rounded-lg border border-slate-200">
+                            <table class="min-w-full bg-white text-sm text-left">
+                                <thead class="bg-slate-50 text-slate-600 font-medium">
+                                    <tr>
+                                        <th class="px-4 py-3">日期</th>
+                                        <th class="px-4 py-3">类型</th>
+                                        <th class="px-4 py-3">详情 (品类/用量)</th>
+                                        <th class="px-4 py-3">操作人</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 text-slate-500">
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="px-4 py-3">2026-05-10</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs bg-lime-100 text-lime-700">施肥</span></td>
+                                        <td class="px-4 py-3">复合肥 (N-P-K) 20kg/亩</td>
+                                        <td class="px-4 py-3">张三</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="px-4 py-3">2026-05-02</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs bg-rose-100 text-rose-700">打药</span></td>
+                                        <td class="px-4 py-3">多菌灵 500倍液 (防根腐病)</td>
+                                        <td class="px-4 py-3">李四</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-50">
+                                        <td class="px-4 py-3">2026-04-20</td>
+                                        <td class="px-4 py-3"><span class="px-2 py-0.5 rounded text-xs bg-lime-100 text-lime-700">施肥</span></td>
+                                        <td class="px-4 py-3">有机底肥</td>
+                                        <td class="px-4 py-3">张三</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4 text-right">
+                             <button class="text-teal-600 text-sm font-medium hover:underline"><i class="fa-solid fa-plus mr-1"></i> 新增农事记录</button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            panel.innerHTML = content;
+        }
+
+        // 设备开关控制逻辑
+        function toggleDevice(device) {
+            deviceState[device] = !deviceState[device];
+            // 立即刷新状态显示 (Mock)
+            fetchRealtime();
+        }
+
+        // 4. 更新 UI
+        function setActiveMetric(index) {
+            activeMetricIndex = index;
+            updateDashboardUI();
+            if(!currentScenario.startsWith('mgmt') || currentScenario.includes('overview')) renderChartFromCache();
+        }
+
+        function updateDashboardUI() {
+            if (currentScenario === 'video') return;
+
+            const config = SCENARIOS[currentScenario];
+            
+            for(let i=0; i<3; i++) {
+                const cardData = config.cards[i];
+                const cardEl = document.getElementById(`card-${i}`);
+                
+                document.getElementById(`label-${i}`).innerText = cardData.label;
+                document.getElementById(`unit-${i}`).innerText = cardData.unit;
+                
+                const iconEl = document.getElementById(`icon-${i}`);
+                iconEl.className = `fa-solid ${cardData.icon} text-2xl transition-colors`;
+                
+                cardEl.className = "card-transition relative overflow-hidden cursor-pointer bg-white rounded-2xl border-2 border-transparent p-6 hover:shadow-xl hover:-translate-y-1 group";
+                document.getElementById(`bg-icon-${i}`).className = `w-12 h-12 rounded-full flex items-center justify-center mb-1 group-hover:scale-110 transition-transform ${cardData.bgColor}`;
+                document.getElementById(`decor-${i}`).className = `absolute -right-6 -bottom-6 w-24 h-24 rounded-full opacity-50 group-hover:scale-150 transition-transform duration-500 ${cardData.bgColor}`;
+                
+                if (i === activeMetricIndex) {
+                    cardEl.classList.remove('bg-white', 'border-transparent');
+                    cardEl.classList.add(cardData.bgColor);
+                    cardEl.classList.add(cardData.borderColor);
+                    cardEl.classList.add('shadow-md');
+                    cardEl.classList.add('ring-2', 'ring-offset-2', 'ring-opacity-50', cardData.ring);
+                    iconEl.classList.add(cardData.iconColor);
+                } else {
+                    iconEl.classList.add(cardData.iconColor);
+                }
+            }
+
+            // 更新标题（非管理模式下或Overview模式）
+            const isMgmtSub = currentScenario.startsWith('mgmt') && !currentScenario.includes('overview');
+            if (!isMgmtSub) {
+                const activeCard = config.cards[activeMetricIndex];
+                const titleEl = document.getElementById('chart-title');
+                const indicatorEl = document.getElementById('chart-indicator');
+                
+                if ((currentScenario.startsWith('analysis') || currentScenario.includes('overview')) && !activeCard.unit) {
+                     titleEl.innerText = `${activeCard.label} (数值化趋势)`;
+                } else {
+                     titleEl.innerText = `${activeCard.label} 趋势分析`;
+                }
+                titleEl.style.color = activeCard.color;
+                indicatorEl.style.backgroundColor = activeCard.color;
+            }
+        }
+
+        // 5. 渲染图表
+        function renderChart(labels, dataPoints) {
+            const ctx = document.getElementById('myChart').getContext('2d');
+            const config = SCENARIOS[currentScenario].cards[activeMetricIndex];
+
+            if (myChart) myChart.destroy();
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: `${config.label}`,
+                        data: dataPoints,
+                        borderColor: config.color,
+                        backgroundColor: function(context) {
+                            const chart = context.chart;
+                            const {ctx, chartArea} = chart;
+                            if (!chartArea) return null;
+                            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+                            
+                            let c = config.color; 
+                            if(c.startsWith('#')) {
+                                const r = parseInt(c.slice(1, 3), 16);
+                                const g = parseInt(c.slice(3, 5), 16);
+                                const b = parseInt(c.slice(5, 7), 16);
+                                gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.0)`); 
+                                gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.2)`); 
+                            }
+                            return gradient;
+                        },
+                        borderWidth: 3,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: config.color,
+                        pointRadius: 4,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#1e293b',
+                            bodyColor: '#334155',
+                            borderColor: '#e2e8f0',
+                            borderWidth: 1,
+                            titleFont: { size: 13, weight: 'bold' },
+                            bodyFont: { size: 13 },
+                            padding: 12,
+                            cornerRadius: 8,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y} ${config.unit || ''}`;
+                                }
+                            }
+                        },
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'x',
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'x',
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#64748b' } },
+                        y: { grid: { borderDash: [4, 4] }, ticks: { color: '#64748b' } }
+                    },
+                    animation: { duration: 600 }
+                }
+            });
+        }
+
+        // 6. 数据获取
+        
+        // 新增：系统状态更新函数
+        function updateSystemStatus(isOnline) {
+            const headerEl = document.getElementById('sys-status-header');
+            const bodyEl = document.getElementById('sys-status-body');
+            
+            if (isOnline) {
+                // Header Status - Online
+                headerEl.innerHTML = `
+                    <span class="relative flex h-2 w-2">
+                      <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    <span class="text-xs font-medium text-blue-100 tracking-wider">SYSTEM ONLINE</span>
+                `;
+                
+                // Body Status - Online
+                bodyEl.className = "flex items-center text-green-600 font-medium transition-colors";
+                bodyEl.innerHTML = `<i class="fa-solid fa-circle text-[8px] mr-1.5"></i>运行正常`;
+            } else {
+                // Header Status - Offline
+                headerEl.innerHTML = `
+                    <span class="relative flex h-2 w-2">
+                      <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    <span class="text-xs font-medium text-red-100 tracking-wider">SYSTEM OFFLINE</span>
+                `;
+                
+                // Body Status - Offline
+                bodyEl.className = "flex items-center text-red-600 font-medium transition-colors";
+                bodyEl.innerHTML = `<i class="fa-solid fa-circle-exclamation text-sm mr-1.5"></i>连接异常`;
+            }
+        }
+
+        async function fetchRealtime() {
+            if (currentScenario === 'video') return;
+
+            try {
+                let data;
+                if (USE_MOCK_DATA) {
+                    data = await new Promise(r => setTimeout(() => r(generateMockRealtime()), 200));
+                } else {
+                    const res = await fetch(`${API_BASE_URL}/now`);
+                    if (!res.ok) throw new Error("Network response was not ok");
+                    data = await res.json();
+                }
+
+                // 成功获取数据：更新状态为在线
+                updateSystemStatus(true);
+
+                // 填充数据到卡片
+                const config = SCENARIOS[currentScenario];
+                for(let i=0; i<3; i++) {
+                    const key = config.cards[i].id;
+                    const val = data[key];
+                    const el = document.getElementById(`val-${i}`);
+                    
+                    if (isNaN(val) && String(val).length > 4) {
+                        el.classList.remove('text-4xl');
+                        el.classList.add('text-2xl');
+                    } else {
+                        el.classList.remove('text-2xl');
+                        el.classList.add('text-4xl');
+                    }
+                    el.innerText = val !== undefined ? val : '--';
+                }
+                document.getElementById('last-updated').innerText = data.timestamp;
+
+            } catch (e) {
+                console.error("Fetch Realtime Error", e);
+                // 获取失败：更新状态为离线
+                updateSystemStatus(false);
+            }
+        }
+
+        async function fetchHistory() {
+            try {
+                let data;
+                if (USE_MOCK_DATA) {
+                    data = await new Promise(r => setTimeout(() => r(generateMockHistory()), 500));
+                } else {
+                    const res = await fetch(`${API_BASE_URL}/history`);
+                    data = await res.json();
+                }
+                historyDataCache = data;
+                if (currentScenario !== 'video' && (!currentScenario.startsWith('mgmt') || currentScenario.includes('overview'))) renderChartFromCache();
+            } catch (e) { console.error(e); }
+        }
+
+        function renderChartFromCache() {
+            if (!historyDataCache) return;
+            const key = SCENARIOS[currentScenario].cards[activeMetricIndex].id;
+            // 简单 fallback: 如果历史数据没有这个key (例如mgmt模式)，就不渲染或渲染空
+            if(historyDataCache[key]) {
+                 renderChart(historyDataCache.time, historyDataCache[key]);
+            }
+        }
+
+        function exportCSV() {
+            if (!historyDataCache) return alert("暂无数据");
+            const config = SCENARIOS[currentScenario].cards[activeMetricIndex];
+            const key = config.id;
+            
+            let csvContent = `data:text/csv;charset=utf-8,Timestamp,${config.label}\n`;
+            if(historyDataCache[key]) {
+                historyDataCache.time.forEach((t, i) => {
+                    csvContent += `${t},${historyDataCache[key][i]}\n`;
+                });
+                const link = document.createElement("a");
+                link.href = encodeURI(csvContent);
+                link.download = `rehmannia_${key}_${new Date().toISOString().slice(0,10)}.csv`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            } else {
+                alert("当前视图不支持导出历史趋势数据");
+            }
+        }
+
+        // --- 初始化 ---
+        window.onload = function() {
+            if (USE_MOCK_DATA) document.getElementById('mock-alert').classList.remove('hidden');
+            
+            // 默认进入综合概览视图，解决“总是在二级菜单”的问题
+            switchScenario('sensing_overview');
+            
+            setInterval(fetchRealtime, 2000);
+            setInterval(fetchHistory, 60000);
+            fetchHistory();
+        };
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

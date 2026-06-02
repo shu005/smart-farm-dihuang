@@ -1,0 +1,331 @@
+ “多进程采集 + 集中存储” 的新框架。
+
+第 1 步：建立“豪宅” (创建标准目录)
+首先，我们在桌面上创建一个总文件夹，把所有东西归类存放，不要再散落在桌面上了。
+
+打开树莓派终端，依次运行以下命令：
+
+# 1. 回到桌面
+cd /home/henan/Desktop
+
+# 2. 创建主项目文件夹
+mkdir Smart_Farm_System
+cd Smart_Farm_System
+
+# 3. 创建四个关键的子文件夹
+mkdir database  # 放数据库文件
+mkdir drivers   # 放采集脚本 (工人)
+mkdir server    # 放 Flask 服务 (服务员)
+mkdir web       # 放 HTML 网页 (菜单)
+现在您的文件结构应该是这样的（非常清晰）：
+
+Smart_Farm_System/
+├── database/
+├── drivers/
+├── server/
+└── web/
+第 2 步：打地基 (初始化数据库)
+我们需要一个脚本，运行一次即可，用来生成那个统一的数据库文件。
+
+操作：
+
+在 Smart_Farm_System 根目录下，新建文件 init_db.py。
+粘贴以下代码：
+import sqlite3
+import os
+
+# 数据库统一存放在 database 文件夹下
+DB_PATH = '/home/henan/Desktop/Smart_Farm_System/database/smart_farm.db'
+
+def init_db():
+    print(f"正在初始化数据库: {DB_PATH} ...")
+    
+    # 连接数据库 (如果不存在会自动创建)
+    with sqlite3.connect(DB_PATH) as conn:
+        # 1. 创建空气温湿度表
+        conn.execute('''CREATE TABLE IF NOT EXISTS table_air 
+                       (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
+                        temp REAL, 
+                        hum REAL)''')
+        
+        # 2. 创建光照强度表
+        conn.execute('''CREATE TABLE IF NOT EXISTS table_light 
+                       (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
+                        lux REAL)''')
+        
+        # 3. (预留) 创建土壤表 - 为以后买传感器做准备
+        conn.execute('''CREATE TABLE IF NOT EXISTS table_soil 
+                       (id INTEGER PRIMARY KEY AUTOINCREMENT, 
+                        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, 
+                        temp REAL, hum REAL, ec INTEGER)''')
+
+    print("✅ 数据库表结构初始化成功！")
+
+if __name__ == '__main__':
+    # 确保文件夹存在
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    init_db()
+运行一次：在终端输入 python3 init_db.py。
+成功标志：database 文件夹里出现了一个 smart_farm.db 文件。
+第 3 步：雇佣工人 (编写采集脚本)
+现在我们去 drivers 文件夹，分别编写负责温度和光照的脚本。
+
+工人 A：空气监测 (drivers/task_air.py)
+这个脚本只负责 DHT11。
+
+import time
+import sqlite3
+import board
+import adafruit_dht
+
+# === 配置 ===
+DB_PATH = '/home/henan/Desktop/Smart_Farm_System/database/smart_farm.db'
+# 传感器引脚 (请确认是 D17)
+dhtDevice = adafruit_dht.DHT11(board.D17)
+
+def save_air(t, h):
+    try:
+        # timeout=30 是关键，防止数据库被锁
+        with sqlite3.connect(DB_PATH, timeout=30) as conn:
+            conn.execute("INSERT INTO table_air (temp, hum) VALUES (?, ?)", (t, h))
+        print(f"🌡️ [Air] 温度:{t} 湿度:{h}")
+    except Exception as e:
+        print(f"❌ 写入失败: {e}")
+
+if __name__ == '__main__':
+    print("🚀 空气采集进程启动...")
+    while True:
+        try:
+            t = dhtDevice.temperature
+            h = dhtDevice.humidity
+            if t is not None and h is not None:
+                save_air(t, h)
+            else:
+                print("⚠️ 传感器读数为空")
+        except RuntimeError:
+            # DHT11 读取频繁容易出错，跳过即可
+            time.sleep(1)
+        except Exception as e:
+            dhtDevice.exit()
+            raise e
+        
+        time.sleep(2) # 每2秒干一次活
+工人 B：光照监测 (drivers/task_light.py)
+这个脚本只负责光照。
+
+import time
+import sqlite3
+import random # 如果您有真实光照代码，请在这里替换库
+
+# === 配置 ===
+DB_PATH = '/home/henan/Desktop/Smart_Farm_System/database/smart_farm.db'
+
+def save_light(lux):
+    try:
+        with sqlite3.connect(DB_PATH, timeout=30) as conn:
+            conn.execute("INSERT INTO table_light (lux) VALUES (?)", (lux,))
+        print(f"☀️ [Light] 光照:{lux}")
+    except Exception as e:
+        print(f"❌ 写入失败: {e}")
+
+if __name__ == '__main__':
+    print("🚀 光照采集进程启动...")
+    while True:
+        try:
+            # --- 这里替换为您真实的光照传感器代码 ---
+            # lux = sensor.lux
+            lux = random.randint(100, 800) # 目前用随机数演示
+            # -------------------------------------
+            
+            save_light(lux)
+        except Exception as e:
+            print(f"⚠️ 光照错误: {e}")
+        
+        time.sleep(2)
+第 4 步：培训服务员 (后端 API)
+现在去 server 文件夹，编写 api_server.py。它的任务是从数据库不同的表里把数据取出来，拼成一个完整的 JSON。
+
+from flask import Flask, jsonify
+import sqlite3
+import os
+import random
+
+app = Flask(__name__)
+DB_PATH = '/home/henan/Desktop/Smart_Farm_System/database/smart_farm.db'
+
+def get_latest(table, cols):
+    """通用查表函数"""
+    if not os.path.exists(DB_PATH): return None
+    try:
+        with sqlite3.connect(DB_PATH, timeout=30) as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT {cols} FROM {table} ORDER BY id DESC LIMIT 1")
+            return cursor.fetchone()
+    except: return None
+
+@app.route('/now')
+def get_now():
+    data = {}
+    
+    # 1. 获取空气数据
+    row_air = get_latest('table_air', 'timestamp, temp, hum')
+    if row_air:
+        # row_air[0] 是时间，[1]是温度，[2]是湿度
+        t_str = row_air[0]
+        data['timestamp'] = t_str.split(' ')[1] if ' ' in t_str else t_str
+        data['air_temp'] = round(row_air[1], 1)
+        data['air_hum']  = int(row_air[2])
+    else:
+        # 如果数据库是空的，给个默认值防止报错
+        data['timestamp'] = "--:--"
+        data['air_temp'] = 0
+        data['air_hum'] = 0
+
+    # 2. 获取光照数据
+    row_light = get_latest('table_light', 'lux')
+    if row_light:
+        data['light'] = int(row_light[0])
+    else:
+        data['light'] = 0
+
+    # 3. 补全其他数据 (为了适配那个高级的网页)
+    # 既然还没买土壤传感器，这里我们用算法“推算”一下，保证演示效果
+    temp = data.get('air_temp', 25)
+    hum = data.get('air_hum', 60)
+    
+    data['soil_temp'] = round(temp * 0.85, 1) # 土温通常比气温低
+    data['soil_hum']  = min(hum + 10, 100)    # 土湿通常比气湿高
+    data['soil_ec']   = random.randint(280, 320)
+    
+    data['env_score'] = 92
+    data['limit_factor'] = "环境优良"
+    data['risk_root'] = "低风险"
+    
+    # 4. 允许跨域
+    resp = jsonify(data)
+    resp.headers.add('Access-Control-Allow-Origin', '*')
+    return resp
+
+# 历史数据接口 (简略版，为了不报错)
+@app.route('/history')
+def get_history():
+    return jsonify({"time":[], "air_temp":[], "air_hum":[], "light":[]})
+
+if __name__ == '__main__':
+    print("🚀 API 服务启动 (端口5000)...")
+    app.run(host='0.0.0.0', port=5000)
+第 5 步：装修店面 (前端 HTML)
+进入 web 文件夹，创建 index.html。 这里使用适配了新 API 结构的代码（注意：请记得修改下面的 cpolar 地址）：
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>地黄数智监测中枢</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-50 min-h-screen p-6">
+    <div class="max-w-4xl mx-auto">
+        <div class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-800">地黄产业数智监测中枢</h1>
+                <p class="text-slate-500">Henan University of Technology</p>
+            </div>
+            <div class="bg-green-100 text-green-700 px-4 py-2 rounded-full text-sm font-bold flex items-center">
+                <div class="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                系统运行中
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-red-500">
+                <div class="text-slate-400 text-xs font-bold uppercase">Air Temperature</div>
+                <div class="text-2xl font-bold text-slate-700 mt-1">空气温度</div>
+                <div class="mt-4 text-4xl font-bold text-slate-800">
+                    <span id="val-temp">--</span><span class="text-lg text-slate-400 ml-1">°C</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-blue-500">
+                <div class="text-slate-400 text-xs font-bold uppercase">Air Humidity</div>
+                <div class="text-2xl font-bold text-slate-700 mt-1">空气湿度</div>
+                <div class="mt-4 text-4xl font-bold text-slate-800">
+                    <span id="val-hum">--</span><span class="text-lg text-slate-400 ml-1">%</span>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl shadow-sm border-l-4 border-yellow-500">
+                <div class="text-slate-400 text-xs font-bold uppercase">Light Intensity</div>
+                <div class="text-2xl font-bold text-slate-700 mt-1">光照强度</div>
+                <div class="mt-4 text-4xl font-bold text-slate-800">
+                    <span id="val-light">--</span><span class="text-lg text-slate-400 ml-1">Lx</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8 text-center text-slate-400 text-sm">
+            上次更新: <span id="last-time">--:--</span>
+        </div>
+    </div>
+
+    <script>
+        // 🔴🔴🔴 请修改这里的地址 🔴🔴🔴
+        const API_URL = "http://YOUR_CPOLAR_URL_HERE"; 
+
+        async function updateData() {
+            try {
+                const res = await fetch(`${API_URL}/now`);
+                const data = await res.json();
+
+                document.getElementById('val-temp').innerText = data.air_temp;
+                document.getElementById('val-hum').innerText = data.air_hum;
+                document.getElementById('val-light').innerText = data.light;
+                document.getElementById('last-time').innerText = data.timestamp;
+            } catch (e) {
+                console.error("数据获取失败", e);
+            }
+        }
+
+        setInterval(updateData, 2000);
+        updateData();
+    </script>
+</body>
+</html>
+第 6 步：总开关 (一键启动脚本)
+最后，我们需要一个脚本，能一键把上面那些分散的程序全跑起来。
+
+在 Smart_Farm_System 根目录下，新建 start_all.sh。
+内容如下：
+#!/bin/bash
+
+# 1. 杀死旧进程 (防止重复)
+echo "🛑 正在停止旧服务..."
+pkill -f task_air.py
+pkill -f task_light.py
+pkill -f api_server.py
+
+# 2. 启动采集工人
+echo "🌱 正在启动 [空气] 监测..."
+python3 /home/henan/Desktop/Smart_Farm_System/drivers/task_air.py &
+
+echo "☀️ 正在启动 [光照] 监测..."
+python3 /home/henan/Desktop/Smart_Farm_System/drivers/task_light.py &
+
+# 3. 启动 API 服务
+echo "🚀 正在启动 [Web API] 服务..."
+python3 /home/henan/Desktop/Smart_Farm_System/server/api_server.py &
+
+echo "✅ 系统启动完毕！所有程序已在后台运行。"
+赋予运行权限 (重要)： 在终端输入：chmod +x start_all.sh
+🎉 大功告成！如何运行？
+从现在开始，每次开机后，您只需要做一件事：
+
+打开终端。
+输入：
+cd /home/henan/Desktop/Smart_Farm_System
+./start_all.sh
+然后您就可以在电脑上用 cpolar 网址看大屏了！
+这个结构非常清晰，以后您要加土壤传感器，只需要在 drivers 里加个 task_soil.py，然后在 start_all.sh 里加一行启动命令就行了。完美！

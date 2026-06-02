@@ -1,0 +1,18 @@
+description: Ultralytics YOLOv12n model trained on D:\code\Pycharm\ultralytics-8.3.163-1\ultralytics\cfg\datasets\data11.yaml
+author: Ultralytics
+date: '2026-01-23T10:21:07.726449'
+version: 8.4.5
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+batch: 1
+imgsz:
+- 640
+- 640
+names:
+  0: item
+args:
+  batch: 1
+  half: true
+channels: 3

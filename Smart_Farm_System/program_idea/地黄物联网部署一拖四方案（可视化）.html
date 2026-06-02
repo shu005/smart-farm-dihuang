@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>怀地黄 LoRa 无线组网部署 (五点采样)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; background-color: #f0f8ff; }
+        #canvas-container { width: 100vw; height: 100vh; display: block; touch-action: none; }
+        
+        /* UI 覆盖层 - 可折叠设计 */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            width: 280px;
+            backdrop-filter: blur(10px);
+            transition: height 0.3s ease;
+            overflow: hidden;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* 标题栏 (点击可折叠) */
+        #ui-header {
+            padding: 12px 15px;
+            background: rgba(240, 244, 248, 0.8);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        #ui-header:active { background: #eef2f6; }
+        
+        h1 { margin: 0; font-size: 14px; color: #2c3e50; font-weight: 700; }
+        #fold-icon { font-size: 12px; color: #999; transition: transform 0.3s; }
+        
+        /* 内容区 */
+        #ui-content {
+            padding: 15px;
+            overflow-y: auto;
+            transition: opacity 0.3s;
+        }
+        
+        /* 折叠状态类 */
+        #ui-layer.collapsed #ui-content {
+            display: none;
+        }
+        #ui-layer.collapsed #fold-icon {
+            transform: rotate(-90deg);
+        }
+
+        h2 { margin: 10px 0 5px 0; font-size: 13px; color: #2980b9; font-weight: 600; }
+        h2:first-child { margin-top: 0; }
+        
+        .tag { display: inline-block; padding: 2px 5px; border-radius: 3px; font-size: 10px; margin-right: 4px; color: white; vertical-align: middle; }
+        .tag-gw { background: #34495e; } 
+        .tag-node { background: #3498db; }
+        
+        p { margin: 4px 0; font-size: 11px; color: #555; line-height: 1.5; }
+        ul { margin: 4px 0; padding-left: 15px; font-size: 11px; color: #666; }
+        li { margin-bottom: 3px; }
+        strong { color: #333; }
+
+        /* 视图切换按钮 */
+        .view-btn {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 6px 15px;
+            border-radius: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            font-size: 13px;
+            font-weight: bold;
+            color: #2c3e50;
+            cursor: pointer;
+            pointer-events: auto;
+            display: flex;
+            gap: 12px;
+            white-space: nowrap;
+        }
+        .btn-opt { opacity: 0.6; transition: 0.3s; padding: 2px 5px; }
+        .btn-opt:hover { opacity: 1; }
+        .btn-opt.active { opacity: 1; color: #2980b9; border-bottom: 2px solid #2980b9; }
+
+        /* 3D 标签 */
+        .label {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.4); 
+            color: rgba(255, 255, 255, 0.9);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px; 
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+            transition: opacity 0.3s;
+        }
+        .label::after {
+            content: '';
+            position: absolute;
+            bottom: -20px; 
+            left: 50%;
+            width: 1px;
+            height: 20px;
+            background: rgba(255,255,255,0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+
+    <!-- 可折叠 UI 面板 -->
+    <div id="ui-layer">
+        <div id="ui-header" onclick="togglePanel()">
+            <h1>LoRa 无线组网配置单</h1>
+            <span id="fold-icon">▼</span>
+        </div>
+        <div id="ui-content">
+            <h2><span class="tag tag-gw">网关</span>田边基站 (Gateway)</h2>
+            <p><strong>功能：</strong>数据汇聚中心 & AI 视觉中枢。</p>
+            <p><strong>AI 摄像头 (升级版)：</strong></p>
+            <ul>
+                <li><strong>硬件：</strong>400万像素长焦枪机，支持光学变焦。</li>
+                <li><strong>AI 识别：</strong>内置 NPU 芯片，自动捕捉叶片纹理。</li>
+                <li><strong>病害诊断：</strong>识别<strong>斑枯病</strong>(褐色斑点)、<strong>枯萎病</strong>特征。</li>
+                <li><strong>虫害监测：</strong>识别<strong>红蜘蛛</strong>、<strong>地老虎</strong>活动轨迹。</li>
+            </ul>
+
+            <div style="height:1px; background:#eee; margin:8px 0;"></div>
+
+            <h2><span class="tag tag-node">节点</span>无线采集终端 x5</h2>
+            <p><strong>布局：</strong>四角(内缩5m) + 中心点。</p>
+            <p><strong>环境感知：</strong></p>
+            <ul>
+                <li><strong>空气：</strong>SHT30 (温湿度) - 预警病害环境</li>
+                <li><strong>土壤：</strong>FDR探头 (水分) - 指导精准灌溉</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="view-btn">
+        <span id="btn-top" class="btn-opt active" onclick="switchView('top')">📡 全局网络</span>
+        <span id="btn-node" class="btn-opt" onclick="switchView('node')">🔍 节点特写</span>
+        <span id="btn-cam" class="btn-opt" onclick="switchView('cam')">📷 AI摄像头</span>
+    </div>
+
+    <div id="labels-container"></div>
+
+    <script>
+        // UI 折叠逻辑
+        function togglePanel() {
+            const panel = document.getElementById('ui-layer');
+            panel.classList.toggle('collapsed');
+        }
+
+        // === 场景设置 ===
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xeef5f9);
+        scene.fog = new THREE.Fog(0xeef5f9, 20, 50);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2 - 0.05;
+
+        // 灯光
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(-15, 20, -15);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        scene.add(dirLight);
+
+        // === 材质 ===
+        const matMetal = new THREE.MeshStandardMaterial({ color: 0x95a5a6, roughness: 0.4, metalness: 0.6 });
+        const matWhitePlastic = new THREE.MeshStandardMaterial({ color: 0xfdfdfd, roughness: 0.3 });
+        const matBluePlastic = new THREE.MeshStandardMaterial({ color: 0x3498db, roughness: 0.3 });
+        const matBlackVal = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.5 });
+        const matSoil = new THREE.MeshPhongMaterial({ color: 0x5d4037, transparent:true, opacity:0.9 });
+        const matWire = new THREE.MeshBasicMaterial({ color: 0x111111 });
+        const matLeafFront = new THREE.MeshStandardMaterial({ color: 0x4caf50, side: THREE.FrontSide });
+        const matSolar = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
+        const matSignal = new THREE.LineDashedMaterial({ color: 0x2ecc71, dashSize: 0.5, gapSize: 0.3, opacity: 0.6, transparent: true });
+
+        // === 1. 构建田块 ===
+        const FIELD_SIZE = 20;
+        const fieldGroup = new THREE.Group();
+        const ground = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_SIZE, FIELD_SIZE), matSoil);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        fieldGroup.add(ground);
+        const gridHelper = new THREE.GridHelper(FIELD_SIZE, FIELD_SIZE, 0xaaaaaa, 0x444444);
+        gridHelper.position.y = 0.02;
+        gridHelper.material.opacity = 0.2; // 网格更淡
+        gridHelper.material.transparent = true;
+        fieldGroup.add(gridHelper);
+        scene.add(fieldGroup);
+
+        // 关键坐标
+        const GATEWAY_POS = new THREE.Vector3(-10, 0, -10); // 西北角
+        
+        const NODE_POSITIONS = [
+            { pos: new THREE.Vector3(0, 0, 0), name: "中心节点 (Center)" },
+            { pos: new THREE.Vector3(-5, 0, -5), name: "西北节点 (NW)" },
+            { pos: new THREE.Vector3(5, 0, -5), name: "东北节点 (NE)" },
+            { pos: new THREE.Vector3(-5, 0, 5), name: "西南节点 (SW)" },
+            { pos: new THREE.Vector3(5, 0, 5), name: "东南节点 (SE)" }
+        ];
+
+        // === 标签系统 ===
+        const labelsContainer = document.getElementById('labels-container');
+        const labels = [];
+        
+        function addLabel(text, pos) {
+            const div = document.createElement('div');
+            div.className = 'label';
+            div.textContent = text;
+            labelsContainer.appendChild(div);
+            // 抬高标签位置，避免遮挡
+            const offsetPos = pos.clone().add(new THREE.Vector3(0, 0.5, 0)); 
+            labels.push({ el: div, pos: offsetPos });
+        }
+
+        // === 2. 部署网关 (Gateway) ===
+        const gatewayGroup = new THREE.Group();
+        // 杆子 2.6m
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 16), matMetal);
+        pole.position.y = 1.3; pole.castShadow = true;
+        gatewayGroup.add(pole);
+        
+        // 主机箱
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.15), matWhitePlastic);
+        box.position.set(0, 1.4, 0.06); box.castShadow = true;
+        gatewayGroup.add(box);
+        
+        // 太阳能
+        const solarGroup = new THREE.Group();
+        const solarPanel = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.03, 0.45), matSolar);
+        solarGroup.add(solarPanel);
+        solarGroup.position.set(0, 2.1, 0.3); solarGroup.rotation.x = Math.PI/5;
+        gatewayGroup.add(solarGroup);
+        
+        // 摄像头 (优化模型：枪机 + 遮阳罩)
+        const camGroup = new THREE.Group();
+        const camBody = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.18), matWhitePlastic);
+        const camLens = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.02, 16), matBlackVal);
+        camLens.rotation.x = Math.PI/2; camLens.position.z = 0.1;
+        const hoodGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.22, 16, 1, false, 0, Math.PI);
+        const hood = new THREE.Mesh(hoodGeo, matWhitePlastic);
+        hood.rotation.z = Math.PI/2; hood.rotation.y = Math.PI/2; hood.position.y = 0.03; hood.position.z = 0.02;
+        const bracket = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.2), matMetal);
+        bracket.rotation.x = Math.PI/2; bracket.position.z = -0.15; bracket.position.y = -0.05;
+
+        camGroup.add(camBody, camLens, hood, bracket);
+        camGroup.position.set(0, 2.5, 0); 
+        camGroup.lookAt(10, 0, 10); 
+        gatewayGroup.add(camGroup);
+
+        // 网关全向天线
+        const antGwBase = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.1), matBlackVal);
+        antGwBase.position.set(0.12, 1.6, 0);
+        const antGwStick = new THREE.Mesh(new THREE.CylinderGeometry(0.005, 0.005, 0.5), matBlackVal);
+        antGwStick.position.set(0.12, 1.9, 0);
+        gatewayGroup.add(antGwBase, antGwStick);
+
+        gatewayGroup.position.copy(GATEWAY_POS);
+        gatewayGroup.position.x += 0.8; gatewayGroup.position.z += 0.8;
+        scene.add(gatewayGroup);
+
+        addLabel("4G网关 + AI摄像头", gatewayGroup.position.clone().add(new THREE.Vector3(0, 2.6, 0)));
+
+        // === 3. 部署无线节点 (LoRa Nodes) ===
+        const nodesGroup = new THREE.Group();
+        const signalLines = [];
+
+        function createNode(position, name) {
+            const node = new THREE.Group();
+            
+            // 支架杆
+            const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.2), matMetal);
+            stand.position.y = 0.6; stand.castShadow = true;
+            node.add(stand);
+
+            // 节点盒子
+            const rtu = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.14, 0.06), matBluePlastic);
+            rtu.position.y = 1.0;
+            node.add(rtu);
+
+            // 小天线
+            const ant = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.15), matBlackVal);
+            ant.position.set(0.03, 1.1, 0);
+            node.add(ant);
+
+            // 传感器1：空气温湿度
+            const airSensor = new THREE.Group();
+            const airBody = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.06), matWhitePlastic);
+            for(let i=0; i<3; i++){
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.002, 3, 8), matWhitePlastic);
+                ring.rotation.x = Math.PI/2; ring.position.y = -0.01 + i*0.015;
+                airSensor.add(ring);
+            }
+            airSensor.add(airBody);
+            airSensor.position.set(-0.06, 0.7, 0);
+            node.add(airSensor);
+
+            // 传感器2：土壤传感器
+            const soilSensor = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.06, 0.02), matBluePlastic);
+            soilSensor.position.set(0.05, 0.03, 0);
+            node.add(soilSensor);
+            const wire = new THREE.Mesh(new THREE.CylinderGeometry(0.002, 0.002, 0.95), matBlackVal);
+            wire.position.set(0.02, 0.5, 0);
+            node.add(wire);
+            
+            node.position.copy(position);
+            nodesGroup.add(node);
+
+            // 创建信号线
+            const gatewayTop = gatewayGroup.position.clone().add(new THREE.Vector3(0, 2.0, 0));
+            const nodeTop = position.clone().add(new THREE.Vector3(0, 1.1, 0));
+            const lineGeo = new THREE.BufferGeometry().setFromPoints([nodeTop, gatewayTop]);
+            const line = new THREE.Line(lineGeo, matSignal.clone());
+            line.computeLineDistances();
+            scene.add(line);
+            signalLines.push({ line: line, offset: 0 });
+
+            addLabel(name, position.clone().add(new THREE.Vector3(0, 1.1, 0)));
+        }
+
+        NODE_POSITIONS.forEach(n => createNode(n.pos, n.name));
+        scene.add(nodesGroup);
+
+        // === 4. 植株 ===
+        const plantGeo = new THREE.CircleGeometry(0.25, 5);
+        plantGeo.rotateX(-Math.PI/2);
+        const plantCount = 900;
+        const plantMesh = new THREE.InstancedMesh(plantGeo, matLeafFront, plantCount);
+        const dummy = new THREE.Object3D();
+        let idx = 0;
+        for(let x = -9.5; x < 9.5; x += 0.7) {
+            for(let z = -9.5; z < 9.5; z += 0.7) {
+                if(idx >= plantCount) break;
+                let tooClose = false;
+                if(new THREE.Vector3(x,0,z).distanceTo(gatewayGroup.position) < 1.2) tooClose = true;
+                NODE_POSITIONS.forEach(n => {
+                    if(new THREE.Vector3(x,0,z).distanceTo(n.pos) < 0.5) tooClose = true;
+                });
+                if(tooClose) continue;
+
+                dummy.position.set(x + Math.random()*0.2, 0.02, z + Math.random()*0.2);
+                const scale = 0.7 + Math.random() * 0.4;
+                dummy.scale.set(scale, scale, scale);
+                dummy.rotation.y = Math.random() * Math.PI;
+                dummy.updateMatrix();
+                plantMesh.setMatrixAt(idx++, dummy.matrix);
+            }
+        }
+        plantMesh.instanceMatrix.needsUpdate = true;
+        plantMesh.castShadow = true;
+        plantMesh.receiveShadow = true;
+        scene.add(plantMesh);
+
+        // === 5. 交互与动画 ===
+        const views = {
+            top: { pos: new THREE.Vector3(0, 14, 14), target: new THREE.Vector3(0, 0, 0) },
+            node: { pos: new THREE.Vector3(-3, 1.5, -3), target: new THREE.Vector3(0, 0.8, 0) },
+            cam: { pos: gatewayGroup.position.clone().add(new THREE.Vector3(1, 2.5, 1)), target: new THREE.Vector3(0, 0, 0) }
+        };
+        camera.position.copy(views.top.pos);
+        controls.target.copy(views.top.target);
+
+        window.switchView = function(mode) {
+            document.querySelectorAll('.btn-opt').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn-' + mode).classList.add('active');
+            const v = views[mode];
+            const startPos = camera.position.clone();
+            const startTarget = controls.target.clone();
+            let t = 0;
+            function step() {
+                t += 0.04;
+                if(t > 1) t = 1;
+                camera.position.lerpVectors(startPos, v.pos, t);
+                controls.target.lerpVectors(startTarget, v.target, t);
+                controls.update();
+                if(t < 1) requestAnimationFrame(step);
+            }
+            step();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // 信号动画
+            signalLines.forEach(item => {
+                item.offset -= 0.03; 
+                item.line.material.dashOffset = item.offset;
+            });
+
+            // 标签位置同步
+            labels.forEach(item => {
+                const screenPos = item.pos.clone().project(camera);
+                const dist = camera.position.distanceTo(item.pos);
+                if(screenPos.z < 1 && dist < 25) {
+                    const x = (screenPos.x * .5 + .5) * window.innerWidth;
+                    const y = (screenPos.y * -.5 + .5) * window.innerHeight;
+                    item.el.style.transform = `translate(-50%, -50%) translate(${x}px, ${y}px)`;
+                    item.el.style.opacity = Math.max(0.2, 1 - dist/20);
+                } else {
+                    item.el.style.opacity = 0;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+        
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+
+    </script>
+</body>
+</html>
